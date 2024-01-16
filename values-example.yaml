@@ -1,0 +1,100 @@
+# By default, all resources will be located in the same project
+projectId: &projectId test-project
+
+commonName: &commonName gke-node-pool-scaler
+
+# The project where the Cronjobs are deployed
+cronjobsProjectId: *projectId
+
+namespace: *commonName
+
+# The location of the Artifact Registry
+registry:
+  host: us-east1-docker.pkg.dev
+  projectId: *projectId
+  repoName: testrepo
+
+image:
+  path: *commonName
+  tag: stable
+  digest: sha256:65a3abb4dce865134205ca2119cfa2746895aacd63defdfbf812df6d7c0abb28
+
+
+# The IAM Service Account
+# Must be created before deploying this application
+# Must have permissions:
+# - to read from Artifact Registry
+# - to administer any cluster that is to act upon
+iamServiceAccount:
+  name: *commonName
+  projectId: *projectId
+
+# The Kubernetes SA
+# Will be linked via Workload Identity to the IAM Service Account above
+kubernetesServiceAccount: *commonName
+
+debug: false
+
+pauseBetweenOperations: 60
+
+clusters:
+
+  - projectId: *projectId
+    location: us-east1-b
+    name: cluster-1
+    nodePools:
+      - name: node-pool-2
+        locationPolicy: ANY
+        scaleDownNodes: 0
+        scaleUpMinNodes: 0
+        scaleUpMaxNodes: 2
+        schedules:
+        - name: cluster-1-node-pool-2-DOWN
+          operationMode: SCALE_DOWN
+          schedule: "0 18 * * *"
+        - name: cluster-1-node-pool-2-UP
+          operationMode: SCALE_UP
+          schedule: "30 6 * * MON-FRI"
+      #
+      - name: node-pool-3
+        locationPolicy: ANY
+        scaleDownNodes: 0
+        scaleUpMinNodes: 0
+        scaleUpMaxNodes: 2
+        schedules:
+        - name: cluster-1-node-pool-3-DOWN
+          operationMode: SCALE_DOWN
+          schedule: "0 18 * * *"
+        - name: cluster-1-node-pool-3-UP
+          operationMode: SCALE_UP
+          schedule: "30 6 * * MON-FRI"
+
+  - projectId: *projectId
+    location: us-east1-b
+    name: cluster-2
+    nodePools:
+      - name: node-pool-2
+        locationPolicy: ANY
+        scaleDownNodes: 0
+        scaleUpMinNodes: 0
+        scaleUpMaxNodes: 2
+        schedules:
+        - name: cluster-2-node-pool-2-DOWN
+          operationMode: SCALE_DOWN
+          schedule: "0 18 * * *"
+        - name: cluster-2-node-pool-2-UP
+          operationMode: SCALE_UP
+          schedule: "30 6 * * MON-FRI"
+      #
+      - name: node-pool-3
+        locationPolicy: ANY
+        scaleDownNodes: 0
+        scaleUpMinNodes: 0
+        scaleUpMaxNodes: 2
+        schedules:
+        - name: cluster-2-node-pool-3-DOWN
+          operationMode: SCALE_DOWN
+          schedule: "0 18 * * *"
+        - name: cluster-2-node-pool-3-UP
+          operationMode: SCALE_UP
+          schedule: "30 6 * * MON-FRI"

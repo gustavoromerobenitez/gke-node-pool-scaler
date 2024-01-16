@@ -1,0 +1,79 @@
+{{- range $cluster := .Values.clusters -}}
+{{- range $nodePool := $cluster.nodePools -}}
+{{- range $schedule := $nodePool.schedules }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: {{ $.Values.commonName }}
+  name: {{ $schedule.name | lower | replace "_" "-" }}-cj
+  namespace: {{ $.Values.namespace }}
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 2
+  schedule: "{{ $schedule.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            workloadType: "user"
+            cloud.google.com/gke-spot: "true" # SpotVMs
+            iam.gke.io/gke-metadata-server-enabled: "true" # Workload Identity
+          tolerations:
+          - key: cloud.google.com/gke-spot
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+          - key: workloadType
+            operator: Equal
+            value: "user"
+            effect: NoSchedule
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: cloud.google.com/gke-spot
+                    operator: In
+                    values:
+                    - "true"
+          serviceAccountName: {{ $.Values.kubernetesServiceAccount }}
+          securityContext:
+            runAsNonRoot: true
+          restartPolicy: Never
+          containers:
+            - name: {{ $.Values.commonName }}
+              image: "{{ printf "%s/%s/%s/%s:%s@%s" $.Values.registry.host $.Values.registry.projectId $.Values.registry.repoName $.Values.image.path $.Values.image.tag $.Values.image.digest | lower}}"
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                runAsUser: 1000
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 200Mi
+                requests:
+                  cpu: 30m
+                  memory: 50Mi
+              env:
+              - name: DEBUG
+                value: "{{ $.Values.debug }}"
+              - name: APP_NAME
+                value: "{{ $.Values.commonName }}"
+              - name: PROJECT_ID
+                value: "{{ $cluster.projectId }}"
+              - name: CLUSTER
+                value: "{{ $cluster.name }}"
+              - name: LOCATION
+                value: "{{ $cluster.location }}"
+              - name: OPERATION_MODE
+                value: "{{ $schedule.operationMode }}"
+              - name: PAUSE_BETWEEN_OPERATIONS
+                value: "{{ $.Values.pauseBetweenOperations }}"
+              - name: NODEPOOL
+                value: {{ printf "%s|%s|%v|%v|%v" $nodePool.name $nodePool.locationPolicy $nodePool.scaleDownNodes $nodePool.scaleUpMinNodes $nodePool.scaleUpMaxNodes | quote }}
+{{- end -}}
+{{- end -}}
+{{- end }}
